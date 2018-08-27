@@ -10085,15 +10085,26 @@ static bool DecodePixelData(/* out */ unsigned char **out_images,
             outLine += (height - 1 - y) * x_stride;
           }
 
-          for (int u = 0; u < width; u++) {
-            tinyexr::FP16 hf;
+          for (size_t v = 0; v < static_cast<size_t>(num_lines); v++) {
+            for (int u = 0; u < width; u++) {
+              tinyexr::FP16 hf;
 
-            // hf.u = line_ptr[u];
-            tinyexr::cpy2(&(hf.u), line_ptr + u);
+              // hf.u = line_ptr[u];
+              tinyexr::cpy2(&(hf.u), line_ptr + u);
 
-            tinyexr::swap2(reinterpret_cast<unsigned short *>(&hf.u));
+              tinyexr::swap2(reinterpret_cast<unsigned short *>(&hf.u));
 
-            outLine[u] = hf.u;
+              outLine[u] = hf.u;
+            }
+
+            if (line_order == 0) {
+              outLine += x_stride;
+            }
+            else {
+              outLine -= x_stride;
+            }
+
+            line_ptr += (static_cast<size_t>(pixel_data_size) / sizeof(unsigned short)) * static_cast<size_t>(width);
           }
         } else if (requested_pixel_types[c] == TINYEXR_PIXELTYPE_FLOAT) {
           float *outLine = reinterpret_cast<float *>(out_images[c]);
@@ -10137,19 +10148,29 @@ static bool DecodePixelData(/* out */ unsigned char **out_images,
           outLine += (height - 1 - y) * x_stride;
         }
 
-        if (reinterpret_cast<const unsigned char *>(line_ptr + width) >
-            (data_ptr + data_len)) {
-          // Insufficient data size
-          return false;
-        }
+        for (size_t v = 0; v < static_cast<size_t>(num_lines); v++) {
+          if (reinterpret_cast<const unsigned char *>(line_ptr + width) >
+              (data_ptr + data_len)) {
+            // Insufficient data size
+            return false;
+          }
 
-        for (int u = 0; u < width; u++) {
-          float val;
-          tinyexr::cpy4(&val, line_ptr + u);
+          for (int u = 0; u < width; u++) {
+            float val;
+            tinyexr::cpy4(&val, line_ptr + u);
 
-          tinyexr::swap4(reinterpret_cast<unsigned int *>(&val));
+            tinyexr::swap4(reinterpret_cast<unsigned int *>(&val));
 
-          outLine[u] = val;
+            outLine[u] = val;
+          }
+
+          if (line_order == 0) {
+            outLine += x_stride;
+          } else {
+            outLine -= x_stride;
+          }
+
+          line_ptr += (static_cast<size_t>(pixel_data_size) / sizeof(float)) * static_cast<size_t>(width);
         }
       } else if (channels[c].pixel_type == TINYEXR_PIXELTYPE_UINT) {
         const unsigned int *line_ptr = reinterpret_cast<const unsigned int *>(
@@ -10162,19 +10183,29 @@ static bool DecodePixelData(/* out */ unsigned char **out_images,
           outLine += (height - 1 - y) * x_stride;
         }
 
-        for (int u = 0; u < width; u++) {
-          if (reinterpret_cast<const unsigned char *>(line_ptr + u) >=
-              (data_ptr + data_len)) {
-            // Corrupsed data?
-            return false;
+        for (size_t v = 0; v < static_cast<size_t>(num_lines); v++) {
+          for (int u = 0; u < width; u++) {
+            if (reinterpret_cast<const unsigned char *>(line_ptr + u) >=
+                (data_ptr + data_len)) {
+              // Corrupted data?
+              return false;
+            }
+
+            unsigned int val;
+            tinyexr::cpy4(&val, line_ptr + u);
+
+            tinyexr::swap4(reinterpret_cast<unsigned int *>(&val));
+
+            outLine[u] = val;
           }
 
-          unsigned int val;
-          tinyexr::cpy4(&val, line_ptr + u);
+          if (line_order == 0) {
+            outLine += x_stride;
+          } else {
+            outLine -= x_stride;
+          }
 
-          tinyexr::swap4(reinterpret_cast<unsigned int *>(&val));
-
-          outLine[u] = val;
+          line_ptr += (static_cast<size_t>(pixel_data_size) / sizeof(unsigned int)) * static_cast<size_t>(width);
         }
       }
     }
